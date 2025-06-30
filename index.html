@@ -1,0 +1,463 @@
+<<<<<<< HEAD:templates/index.html
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>YouTube Downloader </title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: #0f0f0f;
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      background-color: #1f1f1f;
+      padding: 25px 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.3);
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    .logo {
+      font-size: 22px;
+      font-weight: bold;
+      color: red;
+      margin-bottom: 20px;
+    }
+
+    input[type="text"], select {
+      width: 100%;
+      padding: 14px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      background-color: #333;
+      color: white;
+    }
+
+    button {
+      background-color: red;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 10px;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #e60000;
+    }
+
+    #cancelBtn {
+      background-color: #555;
+      margin-top: 10px;
+      display: none;
+    }
+
+    #progressBar {
+      width: 100%;
+      background-color: #333;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-top: 12px;
+      display: none;
+    }
+
+    #progressBarInner {
+      height: 10px;
+      width: 0%;
+      background-color: red;
+      transition: width 0.3s ease;
+    }
+
+    .popup {
+      background-color: #222;
+      border: 1px solid red;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 10px;
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: none;
+      font-size: 14px;
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        padding: 20px 15px;
+      }
+
+      .logo {
+        font-size: 20px;
+      }
+
+      input[type="text"], select, button {
+        font-size: 15px;
+        padding: 12px;
+      }
+
+      .popup {
+        bottom: 10px;
+        right: 10px;
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">YouTube Downloader</div>
+    <form id="downloadForm">
+      <input type="text" id="url" name="url" placeholder="Paste YouTube Link" required><br>
+      <select name="format" id="format">
+        <option value="mp3">MP3</option>
+        <option value="mp4">MP4</option>
+      </select><br>
+      <button type="submit" id="downloadBtn">Download</button>
+      <button type="button" id="cancelBtn">Cancel</button>
+      <div id="progressBar">
+        <div id="progressBarInner"></div>
+      </div>
+    </form>
+  </div>
+
+  <div class="popup" id="popup">✅ Download Complete!</div>
+
+  <script>
+  const form = document.getElementById("downloadForm");
+  const progressBar = document.getElementById("progressBar");
+  const progressBarInner = document.getElementById("progressBarInner");
+  const popup = document.getElementById("popup");
+  const cancelBtn = document.getElementById("cancelBtn");
+
+  let nextButton, isCanceled = false, progressSim;
+
+  // Show popup message from query string
+  window.addEventListener("load", () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("status") === "canceled") {
+      popup.innerText = "❌ Downloading Canceled!";
+      popup.style.display = "block";
+      setTimeout(() => popup.style.display = "none", 3000);
+    }
+  });
+
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    progressBar.style.display = "block";
+    progressBarInner.style.width = "0%";
+    cancelBtn.style.display = "inline-block";
+    isCanceled = false;
+
+    const url = document.getElementById("url").value;
+    const format = document.getElementById("format").value;
+
+    let fakeProgress = 0;
+    progressSim = setInterval(() => {
+      if (!isCanceled && fakeProgress < 90) {
+        fakeProgress += Math.floor(Math.random() * 5);
+        progressBarInner.style.width = `${fakeProgress}%`;
+      }
+    }, 500);
+
+    const res = await fetch("/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `url=${encodeURIComponent(url)}&format=${encodeURIComponent(format)}`
+    });
+
+    clearInterval(progressSim);
+    cancelBtn.style.display = "none";
+
+    if (isCanceled) return; // prevent further handling
+
+    const result = await res.json();
+    if (result.status === "success") {
+      progressBarInner.style.width = "100%";
+      popup.innerText = "✅ Download Complete!";
+      popup.style.display = "block";
+      window.location.href = `/get-file?filename=${encodeURIComponent(result.filename)}`;
+      setTimeout(() => {
+        popup.style.display = "none";
+        showNextButton();
+      }, 4000);
+    } else {
+      alert("❌ Download Failed: " + result.message);
+    }
+  });
+
+  cancelBtn.addEventListener("click", () => {
+    isCanceled = true;
+    clearInterval(progressSim);
+    window.location.href = "/?status=canceled"; // refresh page with status flag
+  });
+
+  function showNextButton() {
+    if (!nextButton) {
+      nextButton = document.createElement("button");
+      nextButton.textContent = "Next Download";
+      nextButton.style.marginTop = "20px";
+      nextButton.style.backgroundColor = "#fff";
+      nextButton.style.color = "#000";
+      nextButton.style.fontWeight = "bold";
+      nextButton.onclick = () => window.location.reload();
+      form.appendChild(nextButton);
+    }
+  }
+</script>
+
+</body>
+</html>
+=======
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>YouTube Downloader</title>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      font-family: 'Roboto', sans-serif;
+      background-color: #0f0f0f;
+      color: #fff;
+      margin: 0;
+      padding: 20px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    .container {
+      background-color: #1f1f1f;
+      padding: 25px 20px;
+      border-radius: 12px;
+      box-shadow: 0 0 20px rgba(255, 0, 0, 0.3);
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    .logo {
+      font-size: 22px;
+      font-weight: bold;
+      color: red;
+      margin-bottom: 20px;
+    }
+
+    input[type="text"], select {
+      width: 100%;
+      padding: 14px;
+      margin: 10px 0;
+      border: none;
+      border-radius: 6px;
+      font-size: 16px;
+      background-color: #333;
+      color: white;
+    }
+
+    button {
+      background-color: red;
+      color: white;
+      border: none;
+      padding: 12px 20px;
+      font-size: 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 10px;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #e60000;
+    }
+
+    #cancelBtn {
+      background-color: #555;
+      margin-top: 10px;
+      display: none;
+    }
+
+    #progressBar {
+      width: 100%;
+      background-color: #333;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-top: 12px;
+      display: none;
+    }
+
+    #progressBarInner {
+      height: 10px;
+      width: 0%;
+      background-color: red;
+      transition: width 0.3s ease;
+    }
+
+    .popup {
+      background-color: #222;
+      border: 1px solid red;
+      color: white;
+      padding: 12px 20px;
+      border-radius: 10px;
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      z-index: 1000;
+      display: none;
+      font-size: 14px;
+    }
+
+    @media (max-width: 480px) {
+      .container {
+        padding: 20px 15px;
+      }
+
+      .logo {
+        font-size: 20px;
+      }
+
+      input[type="text"], select, button {
+        font-size: 15px;
+        padding: 12px;
+      }
+
+      .popup {
+        bottom: 10px;
+        right: 10px;
+        font-size: 13px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="logo">YouTube Downloader</div>
+    <form id="downloadForm">
+      <input type="text" id="url" name="url" placeholder="Paste YouTube Link" required><br>
+      <select name="format" id="format">
+        <option value="mp3">MP3</option>
+        <option value="mp4">MP4</option>
+      </select><br>
+      <button type="submit" id="downloadBtn">Download</button>
+      <button type="button" id="cancelBtn">Cancel</button>
+      <div id="progressBar">
+        <div id="progressBarInner"></div>
+      </div>
+    </form>
+  </div>
+
+  <div class="popup" id="popup">✅ Download Complete!</div>
+
+  <script>
+  const form = document.getElementById("downloadForm");
+  const progressBar = document.getElementById("progressBar");
+  const progressBarInner = document.getElementById("progressBarInner");
+  const popup = document.getElementById("popup");
+  const cancelBtn = document.getElementById("cancelBtn");
+
+  let nextButton, isCanceled = false, progressSim;
+
+  // Show popup message from query string
+  window.addEventListener("load", () => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("status") === "canceled") {
+      popup.innerText = "❌ Downloading Canceled!";
+      popup.style.display = "block";
+      setTimeout(() => popup.style.display = "none", 3000);
+    }
+  });
+
+  form.addEventListener("submit", async function (e) {
+    e.preventDefault();
+
+    progressBar.style.display = "block";
+    progressBarInner.style.width = "0%";
+    cancelBtn.style.display = "inline-block";
+    isCanceled = false;
+
+    const url = document.getElementById("url").value;
+    const format = document.getElementById("format").value;
+
+    let fakeProgress = 0;
+    progressSim = setInterval(() => {
+      if (!isCanceled && fakeProgress < 90) {
+        fakeProgress += Math.floor(Math.random() * 5);
+        progressBarInner.style.width = `${fakeProgress}%`;
+      }
+    }, 500);
+
+    const res = await fetch("/download", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `url=${encodeURIComponent(url)}&format=${encodeURIComponent(format)}`
+    });
+
+    clearInterval(progressSim);
+    cancelBtn.style.display = "none";
+
+    if (isCanceled) return; // prevent further handling
+
+    const result = await res.json();
+    if (result.status === "success") {
+      progressBarInner.style.width = "100%";
+      popup.innerText = "✅ Download Complete!";
+      popup.style.display = "block";
+      window.location.href = `/get-file?filename=${encodeURIComponent(result.filename)}`;
+      setTimeout(() => {
+        popup.style.display = "none";
+        showNextButton();
+      }, 4000);
+    } else {
+      alert("❌ Download Failed: " + result.message);
+    }
+  });
+
+  cancelBtn.addEventListener("click", () => {
+    isCanceled = true;
+    clearInterval(progressSim);
+    window.location.href = "/?status=canceled"; // refresh page with status flag
+  });
+
+  function showNextButton() {
+    if (!nextButton) {
+      nextButton = document.createElement("button");
+      nextButton.textContent = "Next Download";
+      nextButton.style.marginTop = "20px";
+      nextButton.style.backgroundColor = "#fff";
+      nextButton.style.color = "#000";
+      nextButton.style.fontWeight = "bold";
+      nextButton.onclick = () => window.location.reload();
+      form.appendChild(nextButton);
+    }
+  }
+</script>
+
+</body>
+</html>
+>>>>>>> 0bc4feeabc572e96454cf073458cd732a7147e4f:index.html
